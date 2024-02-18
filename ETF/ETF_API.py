@@ -1,0 +1,57 @@
+"""
+ETF Support File 1
+Rotman BMO Finance Research and Trading Lab, Uniersity of Toronto (C)
+"""
+# pip install tabulate
+import signal
+import requests
+from time import sleep
+import pandas as pd
+
+# class that passes error message, ends the program
+class ApiException(Exception):
+    pass
+
+# code that lets us shut down if CTRL C is pressed
+def signal_handler(signum, frame):
+    global shutdown
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    shutdown = True
+    
+API_KEY = {'X-API-Key': 'rotman'}
+shutdown = False
+session = requests.Session()
+session.headers.update(API_KEY)
+    
+#code that gets the current tick
+def get_tick(session):
+    resp = session.get('http://localhost:9999/v1/case')
+    if resp.ok:
+        case = resp.json()
+        return case['tick']
+    raise ApiException('fail - cant get tick')
+    
+#pull securities data    
+def get_securities(session):
+    book = session.get('http://localhost:9999/v1/securities')
+    if book.ok:
+        securities = book.json()
+        return securities
+    raise ApiException('Error retrieving basic security info')
+
+def main():
+    with requests.Session() as session:
+        session.headers.update(API_KEY)
+        etf = pd.DataFrame(columns = ['position', 'last', 'bid_size', 'bid', 'ask', 'ask_size', 'volume'], index = ['RITC', 'COMP'])
+        while get_tick(session) < 600 and not shutdown:
+            if get_tick(session) == 0:
+                print('Wait for Case')
+                sleep(1)
+            else:
+                for i in get_securities(session):
+                    etf.loc[i['ticker']] = pd.Series({'position': i['position'], 'last': i['last'], 'bid_size': i['bid_size'], 'bid': i['bid'], 'ask': i['ask'], 'ask_size': i['ask_size'], 'volume': i['volume']})
+                print(etf.to_markdown(), end = '\n'*2)
+                sleep(0.2)
+        
+if __name__ == '__main__':
+    main() 

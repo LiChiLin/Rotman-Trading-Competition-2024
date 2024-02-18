@@ -1,0 +1,74 @@
+"""
+ETF Support File 2
+Rotman BMO Finance Research and Trading Lab, Uniersity of Toronto (C)
+"""
+import signal
+import requests
+from time import sleep
+import pandas as pd
+import numpy as np
+
+# class that passes error message, ends the program
+class ApiException(Exception):
+    pass
+
+# code that lets us shut down if CTRL C is pressed
+def signal_handler(signum, frame):
+    global shutdown
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    shutdown = True
+    
+API_KEY = {'X-API-Key': 'rotman'}
+shutdown = False
+session = requests.Session()
+session.headers.update(API_KEY)
+    
+#code that gets the current tick
+def get_tick(session):
+    resp = session.get('http://localhost:9999/v1/case')
+    if resp.ok:
+        case = resp.json()
+        return case['tick']
+    raise ApiException('fail - cant get tick')
+    
+#pull securities data    
+def get_book_securities(session):
+    book = session.get('http://localhost:9999/v1/securities/book', params = {'ticker': 'RITC'})
+    if book.ok:
+        securities = book.json()
+        return securities
+    raise ApiException('Error retrieving basic security info')
+
+def main():
+    with requests.Session() as session:
+        session.headers.update(API_KEY)
+        pd.options.mode.chained_assignment = None
+        ritc  = pd.DataFrame(index = range(20), columns = ['bidVWAP', 'cum_bid_vol', 'bid_volume', 'bid_price', 'ask_price', 'ask_volume', 'cum_ask_vol', 'askVWAP'])
+        while get_tick(session) < 600 and not shutdown:           
+            if get_tick(session) == 0:
+                print('Wait for Case')
+                sleep(1)
+            else:
+                ritc_bids = pd.DataFrame(get_book_securities(session)['bids'])
+                ritc_bids.drop(columns = ['order_id', 'period', 'tick', 'ticker', 'type', 'action', 'vwap', 'status'], inplace=True)
+                ritc_asks = pd.DataFrame(get_book_securities(session)['asks'])
+                ritc_asks.drop(columns = ['order_id', 'period', 'tick', 'ticker', 'type', 'action', 'vwap', 'status'], inplace=True)
+
+                ritc['bid_volume'] = ritc_bids['quantity']
+                ritc['bid_price'] = ritc_bids['price']
+                ritc['ask_price'] = ritc_asks['price']
+                ritc['ask_volume'] = ritc_asks['quantity']
+                for row in ritc.index.values:
+                    ritc['cum_bid_vol'].iloc[row] = ritc['bid_volume'].iloc[:row + 1].sum()
+                    ritc['cum_ask_vol'].iloc[row] = ritc['ask_volume'].iloc[:row + 1].sum()
+                    arr1 = np.array(ritc['bid_volume'].iloc[:row + 1])
+                    arr2 = np.array(ritc['bid_price'].iloc[:row + 1])
+                    arr3 = np.array(ritc['ask_volume'].iloc[:row + 1])
+                    arr4 = np.array(ritc['ask_price'].iloc[:row + 1])
+                    ritc['bidVWAP'].iloc[row] = np.dot(arr1, arr2) / ritc['cum_bid_vol'].iloc[row]
+                    ritc['askVWAP'].iloc[row] = np.dot(arr3, arr4) / ritc['cum_ask_vol'].iloc[row]
+                print(ritc.to_markdown(), end = '\n'*3)
+                sleep(0.2)
+
+if __name__ == '__main__':
+    main()

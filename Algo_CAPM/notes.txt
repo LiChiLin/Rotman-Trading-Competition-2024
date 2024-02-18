@@ -1,0 +1,2 @@
+1. Pair Trading
+2. Stop Loss Order (by percentage)

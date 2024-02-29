@@ -516,7 +516,7 @@ def main():
             )
             # print(now_gross_position)
             # print(now_net_position)
-            if (now_gross_position >= 230000) or (now_net_position >= 80000):
+            if (now_gross_position >= 230000) or (now_net_position >= 30000):
                 liquidate(session, current_positions)
 
 

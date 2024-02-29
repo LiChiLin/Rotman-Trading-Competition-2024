@@ -330,8 +330,8 @@ def main():
 
         # Initialize the setting
         # Trading limits
-        gross_limit = 250000
-        net_limit = 100000
+        gross_limit = 250000  # Adjust when needed
+        net_limit = 100000  # Adjust when needed
 
         while get_tick(session) < 600 and not shutdown:
             # update the forward market price and rf rate
@@ -507,7 +507,7 @@ def main():
             )
             print(now_gross_position)
             print(now_net_position)
-            if (now_gross_position >= 230000) or (now_net_position >= 95000):
+            if (now_gross_position >= 230000) or (now_net_position >= 30000):
                 liquidate(session, current_positions)
 
 
